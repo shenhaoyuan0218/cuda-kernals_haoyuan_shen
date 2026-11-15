@@ -1,59 +1,44 @@
-// W1: vector add. Run on Colab/AutoDL with nvcc (MacBook has no NVIDIA GPU).
-#include <cstdio>
-#include <vector>
-#include "../common/cuda_check.h"
+// 向量加法：CPU 版（PMPP 图 2.4）
+#include <stdio.h>        // printf 等输入输出
+#include <stdlib.h>       // malloc、free
+#include <cuda_runtime.h> // CUDA 接口；这个 CPU 版其实用不到，Mac 上标红正常
 
-__global__ void vector_add(const float* a, const float* b, float* c, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) c[i] = a[i] + b[i];
+// A、B、C 是指针：只存数组开头的地址，不存内容
+// 内容在 main 里 malloc 出来的那块内存（堆）里
+// 指针不知道数组多长，所以要另外传 N
+void vecAdd(float* A, float* B, float* C, int N) {
+    for (int i = 0; i < N; i++) {
+        // A[i] 等于 *(A + i)：从开头往后跳 i 格，取出那格的数
+        // 这里的 A 和 main 里的 A 指向同一块内存，所以改 C 会直接改到 main 的 C
+        C[i] = A[i] + B[i];
+    }
 }
 
 int main() {
-    const int n = 1 << 20;
-    const size_t bytes = n * sizeof(float);
+    int N = 1000;
 
-    std::vector<float> ha(n), hb(n), hc(n), href(n);
-    for (int i = 0; i < n; ++i) {
-        ha[i] = 1.0f;
-        hb[i] = 2.0f;
-        href[i] = 3.0f;
+    // malloc：在 CPU 内存（堆）里申请 N 个 float 的连续空间，只划地方、不放数
+    // sizeof(float) = 一个 float 的字节数（4），乘 N 得到总字节数
+    // (float*)：把 malloc 返回的地址转成「指向 float 的指针」
+    // 必须先 malloc 再写 A[i]，否则 A 指向的不是自己的空间
+    float *A = (float*)malloc(N * sizeof(float));
+    float *B = (float*)malloc(N * sizeof(float));
+    float *C = (float*)malloc(N * sizeof(float));
+
+    // 填测试数据：这一步才往申请的空间里放内容
+    // A = 0,1,2,...；B = 0,2,4,...（2.0f 中的 f 表示 float）
+    for (int i = 0; i < N; i++) {
+        A[i] = i;
+        B[i] = 2.0f * i;
     }
 
-    float *da = nullptr, *db = nullptr, *dc = nullptr;
-    CUDA_CHECK(cudaMalloc(&da, bytes));
-    CUDA_CHECK(cudaMalloc(&db, bytes));
-    CUDA_CHECK(cudaMalloc(&dc, bytes));
-    CUDA_CHECK(cudaMemcpy(da, ha.data(), bytes, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(db, hb.data(), bytes, cudaMemcpyHostToDevice));
+    // 传的是三个数组的起始地址 + 长度，不会复制整个数组
+    vecAdd(A, B, C, N);
+    // 此时 C[i] 应为 3*i
 
-    const int threads = 256;
-    const int blocks = (n + threads - 1) / threads;
-
-    cudaEvent_t start, stop;
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-    CUDA_CHECK(cudaEventRecord(start));
-    vector_add<<<blocks, threads>>>(da, db, dc, n);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-
-    float ms = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-    CUDA_CHECK(cudaMemcpy(hc.data(), dc, bytes, cudaMemcpyDeviceToHost));
-
-    int mismatches = 0;
-    for (int i = 0; i < n; ++i) {
-        if (hc[i] != href[i]) ++mismatches;
-    }
-
-    std::printf("vector_add n=%d blocks=%d threads=%d time=%.3f ms mismatches=%d\n",
-                n, blocks, threads, ms, mismatches);
-
-    CUDA_CHECK(cudaFree(da));
-    CUDA_CHECK(cudaFree(db));
-    CUDA_CHECK(cudaFree(dc));
-    CUDA_CHECK(cudaEventDestroy(start));
-    CUDA_CHECK(cudaEventDestroy(stop));
-    return mismatches == 0 ? 0 : 1;
+    // 把 malloc 申请的内存还给系统
+    free(A);
+    free(B);
+    free(C);
+    return 0;
 }
