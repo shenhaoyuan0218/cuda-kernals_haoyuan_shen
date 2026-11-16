@@ -53,6 +53,9 @@ __global__ void vecAddKernel(float* A, float* B, float* C, int N) {
     // 算出当前线程的全局编号 i = 块大小 × 块编号 + 块内编号
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     // 线程总数可能多于 N，多出来的线程不做事，防止越界
+    //补充一下二维线程写法（多维以此类推）
+    //int col = blockIdx.x * blockDim.x + threadIdx.x;
+    //int row = blockIdx.y * blockDim.y + threadIdx.y;
     if (i < N) {
         C[i] = A[i] + B[i];
     }
