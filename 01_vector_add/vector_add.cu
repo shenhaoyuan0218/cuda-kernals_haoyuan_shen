@@ -76,7 +76,7 @@ void vecAdd(float* A, float* B, float* C, int N) {
 
     // 第 2 部分：启动核函数，每块 256 个线程，块数向上取整，保证线程总数够 N 个
     // 传的是 d_ 开头的 GPU 地址，核函数只能读写显存
-    vecAddKernel<<<(N + 255) / 256, 256>>>(d_A, d_B, d_C, N);
+    vecAddKernel<<<(N + 255) / 256, 256>>>(d_A, d_B, d_C, N);//这是cuda编译系统中1D线程块的专属默认写法，<<<...>>>是cuda的语法，里面是线程块的数量和每个线程块的线程数量 <<<dimGrid, dimBlock>>>，dimGrid是线程块的数量，dimBlock是每个线程块的线程数
     // 也可以写成 vecAddKernel<<<ceil(n/256.0) , 256>>>(d_A, d_B, d_C, N);这样也可以实现向上取整，ceil() 是向上取整函数，n/256.0 这样写是为了让 n/256.0 变成浮点数，ceil() 才能向上取整
 
     // 第 3 部分：把结果从 GPU 拷回 CPU 的 C，主机代码才看得到
