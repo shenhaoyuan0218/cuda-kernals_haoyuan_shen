@@ -81,7 +81,7 @@ __global__ void matrixmulKernel(float* M, float* N,
     }
 }
 
-// 主机端辅助函数：检查 CUDA 调用的返回值。
+// 主机端辅助函数：检查 CUDA 调用的返回值。#这个是错误检查函数
 void check(cudaError_t result) {
     if (result != cudaSuccess) {
         std::fprintf(stderr, "CUDA: %s\n", cudaGetErrorString(result));
@@ -98,13 +98,13 @@ void check(cudaError_t result) {
 #if DEMO == 1
 // 彩色转灰度：每个输入像素连续占 3 字节，每个输出像素占 1 字节。
 int main() {
-    constexpr int width = 2, height = 2;
-    const unsigned char rgb_h[] = {100, 0, 0,   0, 100, 0,
+    constexpr int width = 2, height = 2; // constexpr：常量表达式
+    const unsigned char rgb_h[] = {100, 0, 0,   0, 100, 0, // const：常量
                                    0, 0, 100,   0, 0, 0};
     unsigned char gray_h[width * height];
     unsigned char *rgb_d, *gray_d;
 
-    check(cudaMalloc(&rgb_d, sizeof(rgb_h)));
+    check(cudaMalloc(&rgb_d, sizeof(rgb_h))); //关于“&”的遗留问题：rgb_d 是 CPU 端的一个变量，它的工作是保存 GPU 地址。 刚开始还没分配显存，所以它暂时存着 nullptr。现在你希望 cudaMalloc 分配显存后，把得到的地址写进 rgb_d 这个变量里。要让函数能写它，就传 &rgb_d，也就是这个变量自身的地址。
     check(cudaMalloc(&gray_d, sizeof(gray_h)));
     check(cudaMemcpy(rgb_d, rgb_h, sizeof(rgb_h), cudaMemcpyHostToDevice));
 
@@ -112,7 +112,7 @@ int main() {
     dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x,
                  (height + dimBlock.y - 1) / dimBlock.y);
     colorToGrayscaleConversion<<<dimGrid, dimBlock>>>(rgb_d, gray_d, width, height);
-    check(cudaGetLastError());
+    check(cudaGetLastError()); //检查报错
     check(cudaMemcpy(gray_h, gray_d, sizeof(gray_h), cudaMemcpyDeviceToHost));
     check(cudaFree(rgb_d));
     check(cudaFree(gray_d));
